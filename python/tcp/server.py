@@ -97,27 +97,27 @@ def configure_logging() -> None:
 
 def start_multithreaded_servers(ip: str, port: int, num_servers: int):
     LOG.info('starting %d servers', num_servers)
-    # with concurrent.futures.ThreadPoolExecutor(max_workers=num_servers) as executor:
-    #     futures = {executor.submit(
-    #         Server(ip, port, idx).start()): idx for idx in range(num_servers)}
-    #     for future in concurrent.futures.as_completed(futures):
-    #         idx = futures[future]
-    #         try:
-    #             data = future.result()
-    #         except Exception as exc:
-    #             LOG.exception('server: %d generated an exception', idx)
-    #         else:
-    #             LOG.info('server: %d exited', idx)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=num_servers) as executor:
+        futures = {executor.submit(
+            Server(ip, port, idx).start): idx for idx in range(num_servers)}
+        for future in concurrent.futures.as_completed(futures):
+            idx = futures[future]
+            try:
+                data = future.result()
+            except Exception as exc:
+                LOG.exception('server: %d generated an exception', idx)
+            else:
+                LOG.info('server: %d exited', idx)
 
-    servers = {idx: threading.Thread(target=Server(ip, port, index=idx).start)
-               for idx in range(num_servers)}
-    for server_idx in servers:
-        LOG.info('starting server: %d', server_idx)
-        servers[server_idx].start()
+    # servers = {idx: threading.Thread(target=Server(ip, port, index=idx).start)
+    #            for idx in range(num_servers)}
+    # for server_idx in servers:
+    #     LOG.info('starting server: %d', server_idx)
+    #     servers[server_idx].start()
 
-    for server_idx in servers:
-        servers[server_idx].join()
-        LOG.info('server: %d joined', server_idx)
+    # for server_idx in servers:
+    #     servers[server_idx].join()
+    #     LOG.info('server: %d joined', server_idx)
 
 
 def main() -> None:
