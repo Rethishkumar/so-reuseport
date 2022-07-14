@@ -1,11 +1,8 @@
-from asyncio.log import logger
-import logging
-import concurrent.futures
-from typing import List
-from argparse import ArgumentParser
-import logging.config
 import time
 import socket
+import logging
+import concurrent.futures
+from argparse import ArgumentParser
 
 LOG = logging.getLogger(__name__)
 
@@ -60,7 +57,7 @@ def get_options():
         dest='num_clients', help='Number of clients')
 
     parser.add_argument(
-        '-m', '--messages_per_second', type=int, default=2,
+        '-m', '--messages_per_second', type=float, default=1.0,
         dest='messages_per_second', help='Messages per second')
 
     parser.add_argument(
@@ -80,6 +77,7 @@ def get_options():
 def configure_logging() -> None:
 
     import logging
+    import logging.config
     logging.config.dictConfig(DEFAULT_LOGGING)
     global CMD_OPTIONS
     if CMD_OPTIONS.verbose:
@@ -87,18 +85,19 @@ def configure_logging() -> None:
         l.setLevel(logging.DEBUG)
 
 
-def start_client(client_index: int, messages_per_second: int) -> None:
+def start_client(client_index: int, messages_per_second: float) -> None:
 
     LOG.info('client: %d starting ', client_index)
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((DEFAULT_IP, DEFAULT_PORT))
         while True:
-            LOG.debug('client: %d sending data')
-            s.sendall(b"Hello, world")
-            LOG.debug('client: %d receiving data')
+            LOG.info('client: %d sending data', client_index)
+            s.sendall(bytes(f'client: {client_index} hello', encoding='utf8'))
+            LOG.debug('client: %d receiving data', client_index)
             data = s.recv(1024)
-            LOG.debug('client: %d data %s', data)
+            LOG.info('client: %d data %s', client_index,
+                     data.decode(encoding='utf8'))
             time.sleep(1/messages_per_second)
 
 
@@ -116,9 +115,9 @@ def main() -> None:
             try:
                 data = future.result()
             except Exception as exc:
-                logger.exception('client: %d generated an exception', idx)
+                LOG.exception('client: %d generated an exception', idx)
             else:
-                logger.info('client: %d exited')
+                LOG.info('client: %d exited', idx)
 
 
 if __name__ == '__main__':

@@ -1,7 +1,9 @@
 import time
-import logging.config
+import logging
+import threading
+import concurrent.futures
 from argparse import ArgumentParser
-from multithread.worker import Server as MultiThreadedTCPServer
+from worker import Server
 
 
 import logging
@@ -65,6 +67,10 @@ def get_options():
         help='multithread workers')
 
     parser.add_argument(
+        '-n', '--num_servers', type=int, default=1,
+        dest='num_servers', help='Number of servers')
+
+    parser.add_argument(
         '-v', '--verbose', action='store_true', default=False,
         dest='verbose',
         help='Verbose Logging')
@@ -81,11 +87,37 @@ def get_options():
 def configure_logging() -> None:
 
     import logging
+    import logging.config
     logging.config.dictConfig(DEFAULT_LOGGING)
     global CMD_OPTIONS
     if CMD_OPTIONS.verbose:
         l = logging.getLogger('')
         l.setLevel(logging.DEBUG)
+
+
+def start_multithreaded_servers(ip: str, port: int, num_servers: int):
+    LOG.info('starting %d servers', num_servers)
+    # with concurrent.futures.ThreadPoolExecutor(max_workers=num_servers) as executor:
+    #     futures = {executor.submit(
+    #         Server(ip, port, idx).start()): idx for idx in range(num_servers)}
+    #     for future in concurrent.futures.as_completed(futures):
+    #         idx = futures[future]
+    #         try:
+    #             data = future.result()
+    #         except Exception as exc:
+    #             LOG.exception('server: %d generated an exception', idx)
+    #         else:
+    #             LOG.info('server: %d exited', idx)
+
+    servers = {idx: threading.Thread(target=Server(ip, port, index=idx).start)
+               for idx in range(num_servers)}
+    for server_idx in servers:
+        LOG.info('starting server: %d', server_idx)
+        servers[server_idx].start()
+
+    for server_idx in servers:
+        servers[server_idx].join()
+        LOG.info('server: %d joined', server_idx)
 
 
 def main() -> None:
@@ -94,13 +126,10 @@ def main() -> None:
     opts = get_options()
     configure_logging()
 
-    server = None
     if opts.multi_thread:
-        server = MultiThreadedTCPServer(opts.ip, opts.port)
+        start_multithreaded_servers(opts.ip, opts.port, opts.num_servers)
 
-    server.start()
     time.sleep(600)
-    server.stop()
 
 
 if __name__ == '__main__':
